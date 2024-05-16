@@ -1,0 +1,8 @@
+mimic-iv-1.0
+scrap
+*.gzip
+*.csv.gz
+*summary*.txt
+mimiciv
+saved_models
+data
