@@ -840,7 +840,7 @@ class DL_models2:
 
                     self.optimizer.zero_grad()
                     x, Y_train = torch.cat(
-                        (meds, proc, out, chart, torch.zeros(200, 72, 1)), axis=2
+                        (meds, proc, out, chart, torch.zeros(200, 72, 47)), axis=2
                     ).to(self.device), Y_train.to(self.device)
                     output = self.net(x)
                     loss = self.loss_fn(output, Y_train)
@@ -929,7 +929,7 @@ class DL_models2:
             )
 
             x, y = torch.cat(
-                (meds, proc, out, chart, torch.zeros(200, 72, 1)), axis=2
+                (meds, proc, out, chart, torch.zeros(200, 72, 47)), axis=2
             ).to(self.device), y.to(self.device)
 
             with torch.no_grad():

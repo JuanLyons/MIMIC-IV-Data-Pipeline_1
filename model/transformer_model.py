@@ -273,7 +273,7 @@ class ClassificationHead(nn.Module):
 
     def forward(self, x):
         x = self.norm(x)
-        # x= self.flatten(x)
+        # x = self.flatten(x)
         x = self.seq(x)
         return x
 
@@ -283,7 +283,7 @@ class Transformer(nn.Module):
     def __init__(
         self,
         device,
-        d_model=850,
+        d_model=850,  # Mortality = 850, Lenght of admission= 804
         n_head=5,
         max_len=5000,
         seq_len=72,
@@ -295,7 +295,9 @@ class Transformer(nn.Module):
         super().__init__()
         self.device = device
         self.details = details
-        self.encoder_input_layer = nn.Linear(in_features=850, out_features=d_model)
+        self.encoder_input_layer = nn.Linear(
+            in_features=850, out_features=d_model
+        )  # in_features mortality = 850, lenght of admission = 804
 
         self.pos_emb = PostionalEncoding(
             max_seq_len=max_len, batch_first=False, d_model=d_model, dropout=0.1
