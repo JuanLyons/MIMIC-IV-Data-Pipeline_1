@@ -2,21 +2,16 @@
 # coding: utf-8
 
 import pickle
-import matplotlib.pyplot as plt
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 import pandas as pd
 import numpy as np
 import torch as T
 import torch
-import math
-from sklearn import metrics
+
 import torch.nn as nn
 from torch import optim
 import importlib
-import torch.nn.functional as F
-import import_ipynb
 import model_utils
 import evaluation
 import parameters
@@ -25,26 +20,11 @@ from parameters import *
 # import model as model
 import mimic_model as model
 import random
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
 from imblearn.over_sampling import RandomOverSampler
-from pickle import dump, load
-from sklearn.model_selection import train_test_split
-import captum
+
 from captum.attr import (
-    IntegratedGradients,
-    Occlusion,
-    LayerGradCam,
-    LayerAttribution,
-    LayerDeepLift,
     DeepLift,
 )
-
-# import torchvision.utils as utils
-import argparse
-from torch.autograd import Variable
-from argparse import ArgumentParser
-import matplotlib.pyplot as plt
 
 try:
     get_ipython().run_line_magic("matplotlib", "inline")
@@ -56,7 +36,6 @@ import warnings
 warnings.filterwarnings("ignore")
 warnings.simplefilter("ignore")
 
-# save_path = "saved_models/model.tar"
 if not os.path.exists("saved_models"):
     os.makedirs("saved_models")
 
@@ -217,15 +196,14 @@ class DL_models:
             print("==================={0:2d} FOLD=====================".format(i))
 
             test_hids = list(k_hids[i])
-            # test_hids=test_hids[0:200]
+
             train_ids = list(set([0, 1, 2, 3, 4]) - set([i]))
             train_hids = []
             for j in train_ids:
                 train_hids.extend(k_hids[j])
-            # print(test_hids)
-            # train_hids=train_hids[0:200]
+
             val_hids = random.sample(train_hids, int(len(train_hids) * 0.1))
-            # print(val_hids)
+
             train_hids = list(set(train_hids) - set(val_hids))
             min_loss = 100
             counter = 0
@@ -254,11 +232,6 @@ class DL_models:
                             labels,
                         )
                     )
-                    #                     print(chart.shape)
-                    #                     print(meds.shape)
-                    #                     print(stat_train.shape)
-                    #                     print(demo_train.shape)
-                    #                     print(Y_train.shape)
 
                     output, logits = self.train_model(
                         meds, chart, out, proc, lab, stat_train, demo_train, Y_train
@@ -268,8 +241,6 @@ class DL_models:
                     train_truth.extend(Y_train.data.cpu().numpy())
                     train_logits.extend(logits.data.cpu().numpy())
 
-                # print(train_prob)
-                # print(train_truth)
                 self.loss(
                     torch.tensor(train_prob),
                     torch.tensor(train_truth),
@@ -278,8 +249,7 @@ class DL_models:
                     False,
                 )
                 val_loss = self.model_val(val_hids)
-                # print("Updating Model")
-                # T.save(self.net,self.save_path)
+
                 if val_loss <= min_loss + 0.02:
                     print("Validation results improved")
                     min_loss = val_loss
@@ -300,18 +270,12 @@ class DL_models:
         val_truth = []
         val_logits = []
         self.net.eval()
-        # print(len(val_hids))
+
         for nbatch in range(int(len(val_hids) / (args.batch_size))):
             meds, chart, out, proc, lab, stat_train, demo_train, y = self.getXY(
                 val_hids[nbatch * args.batch_size : (nbatch + 1) * args.batch_size],
                 labels,
             )
-
-            #             print(chart.shape)
-            #             print(meds.shape)
-            #             print(stat_train.shape)
-            #             print(demo_train.shape)
-            #             print(y.shape)
 
             output, logits = self.net(
                 meds, chart, out, proc, lab, stat_train, demo_train
@@ -321,14 +285,11 @@ class DL_models:
 
             output = output.squeeze()
             logits = logits.squeeze()
-            #             print("output",output.shape)
-            #             print("logits",logits.shape)
 
             val_prob.extend(output.data.cpu().numpy())
             val_truth.extend(y.data.cpu().numpy())
             val_logits.extend(logits.data.cpu().numpy())
 
-            # self.model_interpret(meds,chart,out,proc,lab,stat_train,demo_train)
         self.loss(
             torch.tensor(val_prob),
             torch.tensor(val_truth),
@@ -358,21 +319,19 @@ class DL_models:
         self.truth = []
         self.logits = []
         self.net.eval()
-        # print(len(test_hids))
+
         for nbatch in range(int(len(test_hids) / (args.batch_size))):
-            # print(test_hids[nbatch*args.batch_size:(nbatch+1)*args.batch_size])
+
             meds, chart, out, proc, lab, stat, demo, y = self.getXY(
                 test_hids[nbatch * args.batch_size : (nbatch + 1) * args.batch_size],
                 labels,
             )
 
             output, logits = self.net(meds, chart, out, proc, lab, stat, demo)
-            #             self.model_interpret([meds,chart,out,proc,lab,stat,demo])
+
             output = output.squeeze()
             logits = logits.squeeze()
-            #             print(demo.shape)
-            #             print(demo[:,1])
-            #             print(self.eth_vocab)
+
             self.eth.extend(demo[:, 1].tolist())
             self.gender.extend(demo[:, 0].tolist())
             self.ins.extend(demo[:, 2].tolist())
@@ -381,7 +340,7 @@ class DL_models:
             self.prob.extend(output.data.cpu().numpy())
             self.truth.extend(y.data.cpu().numpy())
             self.logits.extend(logits.data.cpu().numpy())
-        # print(self.eth)
+
         self.loss(
             torch.tensor(self.prob),
             torch.tensor(self.truth),
@@ -398,14 +357,12 @@ class DL_models:
         lab = torch.tensor(lab).float()
         stat = torch.tensor(stat).float()
         demo = torch.tensor(demo).float()
-        # print("lab",lab.shape)
-        # print("meds",meds.shape)
+
         print("======= INTERPRETING ========")
         torch.backends.cudnn.enabled = False
         deep_lift = DeepLift(self.net)
         attr = deep_lift.attribute(tuple([meds, chart, out, proc, lab, stat, demo]))
-        # print(attr)
-        # print(attr.shape)
+
         torch.backends.cudnn.enabled = True
 
     def getXY(self, ids, labels):
@@ -418,34 +375,32 @@ class DL_models:
         stat_df = torch.zeros(size=(1, 0))
         demo_df = torch.zeros(size=(1, 0))
         y_df = []
-        # print(ids)
+
         dyn = pd.read_csv("./data/csv/" + str(ids[0]) + "/dynamic.csv", header=[0, 1])
         keys = dyn.columns.levels[0]
-        #         print("keys",keys)
+
         for i in range(len(keys)):
             dyn_df.append(torch.zeros(size=(1, 0)))
-        #         print(len(dyn_df))
+
         for sample in ids:
             if self.data_icu:
                 y = labels[labels["stay_id"] == sample]["label"]
             else:
                 y = labels[labels["hadm_id"] == sample]["label"]
             y_df.append(int(y))
-            #             print(sample)
-            #             print("y_df",y_df)
+
             dyn = pd.read_csv(
                 "./data/csv/" + str(sample) + "/dynamic.csv", header=[0, 1]
             )
-            # print(dyn)
+
             for key in range(len(keys)):
-                #                 print("key",key)
-                #                 print("keys[key]",keys[key])
+
                 dyn_temp = dyn[keys[key]]
                 dyn_temp = dyn_temp.to_numpy()
                 dyn_temp = torch.tensor(dyn_temp)
-                # print(dyn.shape)
+
                 dyn_temp = dyn_temp.unsqueeze(0)
-                # print(dyn.shape)
+
                 dyn_temp = torch.tensor(dyn_temp)
                 dyn_temp = dyn_temp.type(torch.LongTensor)
 
@@ -454,35 +409,31 @@ class DL_models:
                 else:
                     dyn_df[key] = dyn_temp
 
-            #                 print(dyn_df[key].shape)
-
             stat = pd.read_csv(
                 "./data/csv/" + str(sample) + "/static.csv", header=[0, 1]
             )
             stat = stat["COND"]
             stat = stat.to_numpy()
             stat = torch.tensor(stat)
-            #             print(stat.shape)
-            #             print(stat)
-            #             print(stat_df)
+
             if stat_df[0].nelement():
                 stat_df = torch.cat((stat_df, stat), 0)
             else:
                 stat_df = stat
-            #             print(stat_df)
+
             demo = pd.read_csv("./data/csv/" + str(sample) + "/demo.csv", header=0)
-            # print(demo["gender"])
+
             demo["gender"].replace(self.gender_vocab, inplace=True)
-            # print(demo["gender"])
+
             demo["ethnicity"].replace(self.eth_vocab, inplace=True)
             demo["insurance"].replace(self.ins_vocab, inplace=True)
             demo["Age"].replace(self.age_vocab, inplace=True)
             demo = demo[["gender", "ethnicity", "insurance", "Age"]]
-            # print(demo)
+
             demo = demo.values
-            # print(demo)
+
             demo = torch.tensor(demo)
-            # print(dyn.shape)
+
             if demo_df[0].nelement():
                 demo_df = torch.cat((demo_df, demo), 0)
             else:
@@ -508,28 +459,21 @@ class DL_models:
 
         y_df = torch.tensor(y_df)
         y_df = y_df.type(torch.LongTensor)
-        #             #print(stat.shape)
-        #         print("y_df",y_df.shape)
-        #         print("stat_df",stat_df.shape)
-        #         print("demo_df",demo_df.shape)
-        #         print("meds",meds.shape)
-        #         X_df=X_df.type(torch.LongTensor)
+
         return meds, chart, out, proc, lab, stat_df, demo_df, y_df
 
     def train_model(self, meds, chart, out, proc, lab, stat_train, demo_train, Y_train):
 
         self.optimizer.zero_grad()
-        # get the output sequence from the input and the initial hidden and cell states
+
         output, logits = self.net(meds, chart, out, proc, lab, stat_train, demo_train)
         output = output.squeeze()
         logits = logits.squeeze()
-        #         print(output.shape)
-        #         print(logits.shape)
+
         out_loss = self.loss(output, Y_train, logits, True, False)
-        # print("loss",out_loss)
-        # calculate the gradients
+
         out_loss.backward()
-        # update the parameters of the model
+
         self.optimizer.step()
 
         return output, logits
@@ -616,21 +560,12 @@ class DL_models:
         reversed_gender = {self.gender_vocab[key]: key for key in self.gender_vocab}
         reversed_age = {self.age_vocab[key]: key for key in self.age_vocab}
         reversed_ins = {self.ins_vocab[key]: key for key in self.ins_vocab}
-        #         print(self.eth)
-        #         print(reversed_eth)
-
-        # print(self.gender)
 
         self.eth = list(pd.Series(self.eth).map(reversed_eth))
-        #         print(self.eth)
+
         self.gender = list(pd.Series(self.gender).map(reversed_gender))
         self.age = list(pd.Series(self.age).map(reversed_age))
         self.ins = list(pd.Series(self.ins).map(reversed_ins))
-        #         print(self.truth)
-        #         print(self.prob)
-        #         print(self.logits)
-        #         print(self.eth)
-        #         print(self.gender)
 
         output_df = pd.DataFrame()
         output_df["Labels"] = self.truth
@@ -648,6 +583,7 @@ class DL_models:
 class DL_models2:
     def __init__(
         self,
+        arguments,
         data_icu,
         diag_flag,
         proc_flag,
@@ -661,6 +597,7 @@ class DL_models2:
         model_name,
         train,
     ):
+        self.arguments = arguments
         self.save_path = "saved_models/" + model_name + ".tar"
         self.data_icu = data_icu
         (
@@ -734,9 +671,12 @@ class DL_models2:
         else:
             self.device = "cpu"
 
-        self.loss_fn = nn.CrossEntropyLoss(
-            weight=torch.tensor([0.92, 0.08]).to(self.device)
-        )
+        if not self.arguments.regression:
+            self.loss_fn = nn.CrossEntropyLoss(
+                weight=torch.tensor([0.92, 0.08]).to(self.device)
+            )
+        else:
+            self.loss_fn = nn.MSELoss()
         if train:
             print("===============MODEL TRAINING===============")
             self.dl_train()
@@ -758,13 +698,13 @@ class DL_models2:
         y = labels.iloc[:, 1]
         print("Total Samples", len(hids))
         print("Positive Samples", y.sum())
-        # print(len(hids))
+
         if self.oversampling:
             print("=============OVERSAMPLING===============")
             oversample = RandomOverSampler(sampling_strategy="minority")
             hids = np.asarray(hids).reshape(-1, 1)
             hids, y = oversample.fit_resample(hids, y)
-            # print(hids.shape)
+
             hids = hids[:, 0]
             print("Total Samples", len(hids))
             print("Positive Samples", y.sum())
@@ -794,19 +734,18 @@ class DL_models2:
             print("==================={0:2d} FOLD=====================".format(i))
 
             test_hids = list(k_hids[i])
-            # test_hids=test_hids[0:200]
+
             train_ids = list(set([0, 1, 2, 3, 4]) - set([i]))
             train_hids = []
             for j in train_ids:
                 train_hids.extend(k_hids[j])
-            # print(test_hids)
-            # train_hids=train_hids[0:200]
+
             val_hids = random.sample(train_hids, int(len(train_hids) * 0.1))
-            # print(val_hids)
+
             train_hids = list(set(train_hids) - set(val_hids))
             min_loss = 100
             counter = 0
-            args.num_epochs = 1
+            args.num_epochs = 4
             print(f"The number of epochs to train the model are {args.num_epochs}")
             for epoch in range(args.num_epochs):
                 if counter == args.patience:
@@ -832,78 +771,54 @@ class DL_models2:
                             labels,
                         )
                     )
-                    #                     print(chart.shape)
-                    #                     print(meds.shape)
-                    #                     print(stat_train.shape)
-                    #                     print(demo_train.shape)
-                    #                     print(Y_train.shape)
 
                     self.optimizer.zero_grad()
                     x, Y_train = torch.cat(
-                        (meds, proc, out, chart, torch.zeros(200, 72, 47)), axis=2
-                    ).to(self.device), Y_train.to(self.device)
+                        (meds, proc, out, chart, torch.zeros(200, 72, 1)), axis=2
+                    ).to(self.device), torch.tensor(Y_train, dtype=torch.float32).to(
+                        self.device
+                    )
                     output = self.net(x)
                     loss = self.loss_fn(output, Y_train)
                     loss.backward()
-                    # update the parameters of the model
                     self.optimizer.step()
                     if nbatch % 10 == 0:
                         loss, current = loss.item(), nbatch * 200 + len(x)
                         print(f"loss: {loss:>7f}  [{current:>5d}]")
+                self.model_val(val_hids)
             self.model_test(test_hids)
 
     def model_val(self, val_hids):
         print("======= VALIDATION ========")
         labels = pd.read_csv("./data/csv/labels.csv", header=0)
 
-        val_prob = []
-        val_truth = []
-        val_logits = []
+        self.prob = []
+        self.eth = []
+        self.gender = []
+        self.age = []
+        self.ins = []
+        self.truth = []
+        self.logits = []
         self.net.eval()
-        # print(len(val_hids))
+
         for nbatch in range(int(len(val_hids) / (args.batch_size))):
-            meds, chart, out, proc, lab, stat_train, demo_train, y = self.getXY(
+
+            meds, chart, out, proc, lab, stat, demo, y = self.getXY(
                 val_hids[nbatch * args.batch_size : (nbatch + 1) * args.batch_size],
                 labels,
             )
 
-            #             print(chart.shape)
-            #             print(meds.shape)
-            #             print(stat_train.shape)
-            #             print(demo_train.shape)
-            #             print(y.shape)
+            x, y = torch.cat(
+                (meds, proc, out, chart, torch.zeros(200, 72, 1)), axis=2
+            ).to(self.device), torch.tensor(y, dtype=torch.float32).to(self.device)
 
-            output, logits = self.net(
-                meds, chart, out, proc, lab, stat_train, demo_train
-            )
-            output = output.squeeze()
-            logits = logits.squeeze()
+            with torch.no_grad():
+                output = self.net(x)
+            loss = self.loss_fn(output, y)
 
-            output = output.squeeze()
-            logits = logits.squeeze()
-            #             print("output",output.shape)
-            #             print("logits",logits.shape)
-
-            val_prob.extend(output.data.cpu().numpy())
-            val_truth.extend(y.data.cpu().numpy())
-            val_logits.extend(logits.data.cpu().numpy())
-
-            # self.model_interpret(meds,chart,out,proc,lab,stat_train,demo_train)
-        self.loss(
-            torch.tensor(val_prob),
-            torch.tensor(val_truth),
-            torch.tensor(val_logits),
-            False,
-            False,
-        )
-        val_loss = self.loss(
-            torch.tensor(val_prob),
-            torch.tensor(val_truth),
-            torch.tensor(val_logits),
-            True,
-            False,
-        )
-        return val_loss.item()
+            if nbatch % 10 == 0:
+                loss, current = loss.item(), nbatch * 200 + len(x)
+                print(f"loss: {loss:>7f}  [{current:>5d}]")
 
     def model_test(self, test_hids):
 
@@ -918,19 +833,17 @@ class DL_models2:
         self.truth = []
         self.logits = []
         self.net.eval()
-        # print(len(test_hids))
-        predictions = np.array([])
-        annotations = np.array([])
+
         for nbatch in range(int(len(test_hids) / (args.batch_size))):
-            # print(test_hids[nbatch*args.batch_size:(nbatch+1)*args.batch_size])
+
             meds, chart, out, proc, lab, stat, demo, y = self.getXY(
                 test_hids[nbatch * args.batch_size : (nbatch + 1) * args.batch_size],
                 labels,
             )
 
             x, y = torch.cat(
-                (meds, proc, out, chart, torch.zeros(200, 72, 47)), axis=2
-            ).to(self.device), y.to(self.device)
+                (meds, proc, out, chart, torch.zeros(200, 72, 1)), axis=2
+            ).to(self.device), torch.tensor(y, dtype=torch.float32).to(self.device)
 
             with torch.no_grad():
                 output = self.net(x)
@@ -940,16 +853,6 @@ class DL_models2:
                 loss, current = loss.item(), nbatch * 200 + len(x)
                 print(f"loss: {loss:>7f}  [{current:>5d}]")
 
-            predictions = np.append(predictions, output.argmax(1).cpu().numpy())
-            annotations = np.append(annotations, y.cpu().numpy())
-
-        precision, recall, f_score, _ = metrics.precision_recall_fscore_support(
-            predictions, annotations, average="weighted"
-        )
-        print(f"The precision is {precision}")
-        print(f"The recall is {recall}")
-        print(f"The f_Score is {f_score}")
-
     def model_interpret(self, meds, chart, out, proc, lab, stat, demo):
         meds = torch.tensor(meds).float()
         chart = torch.tensor(chart).float()
@@ -958,14 +861,12 @@ class DL_models2:
         lab = torch.tensor(lab).float()
         stat = torch.tensor(stat).float()
         demo = torch.tensor(demo).float()
-        # print("lab",lab.shape)
-        # print("meds",meds.shape)
+
         print("======= INTERPRETING ========")
         torch.backends.cudnn.enabled = False
         deep_lift = DeepLift(self.net)
         attr = deep_lift.attribute(tuple([meds, chart, out, proc, lab, stat, demo]))
-        # print(attr)
-        # print(attr.shape)
+
         torch.backends.cudnn.enabled = True
 
     def getXY(self, ids, labels):
@@ -978,34 +879,31 @@ class DL_models2:
         stat_df = torch.zeros(size=(1, 0))
         demo_df = torch.zeros(size=(1, 0))
         y_df = []
-        # print(ids)
+
         dyn = pd.read_csv("./data/csv/" + str(ids[0]) + "/dynamic.csv", header=[0, 1])
         keys = dyn.columns.levels[0]
-        #         print("keys",keys)
+
         for i in range(len(keys)):
             dyn_df.append(torch.zeros(size=(1, 0)))
-        #         print(len(dyn_df))
+
         for sample in ids:
             if self.data_icu:
                 y = labels[labels["stay_id"] == sample]["label"]
             else:
                 y = labels[labels["hadm_id"] == sample]["label"]
             y_df.append(int(y))
-            #             print(sample)
-            #             print("y_df",y_df)
+
             dyn = pd.read_csv(
                 "./data/csv/" + str(sample) + "/dynamic.csv", header=[0, 1]
             )
-            # print(dyn)
             for key in range(len(keys)):
-                #                 print("key",key)
-                #                 print("keys[key]",keys[key])
+
                 dyn_temp = dyn[keys[key]]
                 dyn_temp = dyn_temp.to_numpy()
                 dyn_temp = torch.tensor(dyn_temp)
-                # print(dyn.shape)
+
                 dyn_temp = dyn_temp.unsqueeze(0)
-                # print(dyn.shape)
+
                 dyn_temp = torch.tensor(dyn_temp)
                 dyn_temp = dyn_temp.type(torch.LongTensor)
 
@@ -1014,35 +912,31 @@ class DL_models2:
                 else:
                     dyn_df[key] = dyn_temp
 
-            #                 print(dyn_df[key].shape)
-
             stat = pd.read_csv(
                 "./data/csv/" + str(sample) + "/static.csv", header=[0, 1]
             )
             stat = stat["COND"]
             stat = stat.to_numpy()
             stat = torch.tensor(stat)
-            #             print(stat.shape)
-            #             print(stat)
-            #             print(stat_df)
+
             if stat_df[0].nelement():
                 stat_df = torch.cat((stat_df, stat), 0)
             else:
                 stat_df = stat
-            #             print(stat_df)
+
             demo = pd.read_csv("./data/csv/" + str(sample) + "/demo.csv", header=0)
-            # print(demo["gender"])
+
             demo["gender"].replace(self.gender_vocab, inplace=True)
-            # print(demo["gender"])
+
             demo["ethnicity"].replace(self.eth_vocab, inplace=True)
             demo["insurance"].replace(self.ins_vocab, inplace=True)
             demo["Age"].replace(self.age_vocab, inplace=True)
             demo = demo[["gender", "ethnicity", "insurance", "Age"]]
-            # print(demo)
+
             demo = demo.values
-            # print(demo)
+
             demo = torch.tensor(demo)
-            # print(dyn.shape)
+
             if demo_df[0].nelement():
                 demo_df = torch.cat((demo_df, demo), 0)
             else:
@@ -1068,12 +962,7 @@ class DL_models2:
 
         y_df = torch.tensor(y_df)
         y_df = y_df.type(torch.LongTensor)
-        #             #print(stat.shape)
-        #         print("y_df",y_df.shape)
-        #         print("stat_df",stat_df.shape)
-        #         print("demo_df",demo_df.shape)
-        #         print("meds",meds.shape)
-        #         X_df=X_df.type(torch.LongTensor)
+
         return meds, chart, out, proc, lab, stat_df, demo_df, y_df
 
     def train_model(self, meds, chart, out, proc, lab, stat_train, demo_train, Y_train):
@@ -1083,11 +972,9 @@ class DL_models2:
         output, logits = self.net(meds, chart, out, proc, lab, stat_train, demo_train)
         output = output.squeeze()
         logits = logits.squeeze()
-        #         print(output.shape)
-        #         print(logits.shape)
+
         out_loss = self.loss(output, Y_train, logits, True, False)
-        # print("loss",out_loss)
-        # calculate the gradients
+
         out_loss.backward()
         # update the parameters of the model
         self.optimizer.step()
@@ -1095,12 +982,16 @@ class DL_models2:
         return output, logits
 
     def create_model(self, model_type):
-        from transformer_model import Transformer
+        from transformer_model import Transformer, TransformerRegression
 
-        self.net = Transformer(self.device)
+        if not self.arguments.regression:
+
+            self.net = Transformer(self.device)
+
+        else:
+            self.net = TransformerRegression(self.device)
 
         self.optimizer = optim.Adam(self.net.parameters(), lr=args.lrn_rate)
-        # criterion = nn.CrossEntropyLoss()
         self.net.to(self.device)
 
     def save_output(self):
@@ -1108,21 +999,12 @@ class DL_models2:
         reversed_gender = {self.gender_vocab[key]: key for key in self.gender_vocab}
         reversed_age = {self.age_vocab[key]: key for key in self.age_vocab}
         reversed_ins = {self.ins_vocab[key]: key for key in self.ins_vocab}
-        #         print(self.eth)
-        #         print(reversed_eth)
-
-        # print(self.gender)
 
         self.eth = list(pd.Series(self.eth).map(reversed_eth))
-        #         print(self.eth)
+
         self.gender = list(pd.Series(self.gender).map(reversed_gender))
         self.age = list(pd.Series(self.age).map(reversed_age))
         self.ins = list(pd.Series(self.ins).map(reversed_ins))
-        #         print(self.truth)
-        #         print(self.prob)
-        #         print(self.logits)
-        #         print(self.eth)
-        #         print(self.gender)
 
         output_df = pd.DataFrame()
         output_df["Labels"] = self.truth

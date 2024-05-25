@@ -48,6 +48,10 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--regression", action="store_true", help="Enable regression task"
+    )
+
+    parser.add_argument(
         "--Length-of-Stay",
         default="Length of Stay ge 3",
         choices=["Length of Stay ge 3", "Length of Stay ge 7", "Custom"],
@@ -263,7 +267,6 @@ def parse_arguments():
 
 
 def main(args):
-    breakpoint()
 
     disease_label = ""
     label = args.prediction_task
@@ -323,7 +326,13 @@ def main(args):
     elif args.version == "version_2":
         version_path = "mimiciv/2.0"
         cohort_output = day_intervals_cohort_v2.extract_data(
-            args.data, label, time, icd_code, root_dir, disease_label
+            args.data,
+            label,
+            time,
+            icd_code,
+            root_dir,
+            disease_label,
+            regression=args.regression,
         )
 
     if data_icu:
@@ -542,6 +551,7 @@ def main(args):
     if data_icu:
         if args.model_type == "Transformer":
             model = dl_train.DL_models2(
+                args,
                 data_icu,
                 diag_flag,
                 proc_flag,
@@ -573,6 +583,7 @@ def main(args):
     else:
         if args.model_type == "Transformer":
             model = dl_train.DL_models2(
+                args,
                 data_icu,
                 diag_flag,
                 proc_flag,
@@ -606,6 +617,7 @@ def main(args):
 def train(args):
     if args.model_type == "Transformer":
         model = dl_train.DL_models2(
+            args,
             True,
             True,
             True,
@@ -621,6 +633,7 @@ def train(args):
         )
     else:
         model = dl_train.DL_model2(
+            args,
             True,
             True,
             True,
@@ -638,5 +651,5 @@ def train(args):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    main(args)
-    # train(args)
+    # main(args)
+    train(args)
